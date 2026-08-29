@@ -1,0 +1,7 @@
+# Backend web server only. Agent deps (google-adk, google-genai) are separate —
+# see agents/requirements.txt — so installing the API never fights the ADK version.
+fastapi>=0.115
+uvicorn[standard]>=0.34
+pydantic>=2.10
+pydantic-settings>=2.7
+python-dotenv>=1.0

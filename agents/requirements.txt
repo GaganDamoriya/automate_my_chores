@@ -1,0 +1,3 @@
+# Agent runtime (Gemini via ADK). Install into the same venv you run the API from.
+google-adk
+google-genai
