@@ -15,6 +15,11 @@ def run():
     """Run the discovery lane and return metrics + scored opportunities (tool logic)."""
     return service.run_discovery()
 
+@router.get("/suggestions", response_model=DiscoveryResult)
+def suggestions():
+    """Alias of /run — the invisible-work opportunities shown on the dashboard."""
+    return service.run_discovery()
+
 @router.post("/execute/{opportunity_id}", response_model=ExecutionResult)
 def execute(opportunity_id: str):
     """Approve + execute one opportunity, then verify the result."""

@@ -1,6 +1,14 @@
-// Thin client for the Invisible Work Detector API.
+// Client for the Invisible Work Automation Platform API.
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+
+async function j<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, { cache: "no-store", ...init });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  return res.json();
+}
+
+// ---------------------------------------------------------------- discovery
 
 export type Opportunity = {
   id: string;
@@ -26,32 +34,105 @@ export type DiscoveryResult = {
   opportunities: Opportunity[];
 };
 
-export async function getDiscovery(): Promise<DiscoveryResult> {
-  const res = await fetch(`${API_BASE}/discovery/run`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  return res.json();
-}
+export const getDiscovery = () => j<DiscoveryResult>("/discovery/suggestions");
+
+// ---------------------------------------------------------------- automations
+
+export type Confirmation = {
+  channel: string;
+  target?: string | null;
+  subject: string;
+  body: string;
+  sent: boolean;
+  simulated: boolean;
+  detail: string;
+};
 
 export type Run = {
   id: string;
+  automation_id: string;
+  trigger: string;
   status: string;
-  opportunity_name?: string | null;
-  approved: boolean;
+  created_at: string;
+  finished_at?: string | null;
   log: { i: number; agent: string; text: string; ts: string }[];
-  result?: { verified: boolean; human_steps_eliminated: number; time_saved_min: number } | null;
+  result?: Record<string, unknown> | null;
+  data_produced?: Record<string, unknown> | null;
+  confirmation?: Confirmation | null;
 };
 
-export async function startRun(): Promise<Run> {
-  const r = await fetch(`${API_BASE}/runs`, { method: "POST" });
-  if (!r.ok) throw new Error(`API ${r.status}`);
-  return r.json();
-}
+export type Automation = {
+  id: string;
+  name: string;
+  description: string;
+  kind: string; // workflow | rework | custom
+  spec: Record<string, unknown>;
+  cadence: string;
+  interval_seconds?: number | null;
+  status: string; // active | paused
+  confirm_channel: string;
+  confirm_target?: string | null;
+  created_at: string;
+  next_run_at?: string | null;
+  last_run_at?: string | null;
+  run_count?: number;
+  last_run?: Run | null;
+  runs?: Run[];
+};
 
-export async function approveRun(id: string): Promise<Run> {
-  const r = await fetch(`${API_BASE}/runs/${id}/approve`, { method: "POST" });
-  if (!r.ok) throw new Error(`API ${r.status}`);
-  return r.json();
-}
+export const listAutomations = () =>
+  j<{ automations: Automation[] }>("/automations").then((r) => r.automations);
+
+export const getAutomation = (id: string) => j<Automation>(`/automations/${id}`);
+
+export const createAutomation = (body: Partial<Automation>) =>
+  j<Automation>("/automations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+export const createFromDescription = (description: string) =>
+  j<{ automation: Automation; parsed: Record<string, unknown> }>(
+    "/automations/from-description",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description }),
+    }
+  );
+
+export const pauseAutomation = (id: string) =>
+  j<Automation>(`/automations/${id}/pause`, { method: "POST" });
+export const resumeAutomation = (id: string) =>
+  j<Automation>(`/automations/${id}/resume`, { method: "POST" });
+export const runAutomation = (id: string) =>
+  j<Run>(`/automations/${id}/run`, { method: "POST" });
+export const deleteAutomation = (id: string) =>
+  j<{ deleted: string }>(`/automations/${id}`, { method: "DELETE" });
+export const listRuns = (id: string) =>
+  j<{ runs: Run[] }>(`/automations/${id}/runs`).then((r) => r.runs);
+
+// ---------------------------------------------------------------- chat
+
+export type ChatResponse = {
+  intent: "build" | "suggest" | "ask";
+  reply: string;
+  created_automation?: Automation;
+  suggestions?: Opportunity[];
+  automations?: Automation[];
+  metrics?: DiscoveryResult["metrics"];
+  parsed?: Record<string, unknown>;
+};
+
+export const chat = (message: string) =>
+  j<ChatResponse>("/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+
+// ---------------------------------------------------------------- rework (data)
 
 export type ReworkTheme = {
   theme: string;
@@ -69,8 +150,24 @@ export type ReworkReport = {
   what_to_look_into: string | null;
 };
 
-export async function getReworkReport(): Promise<ReworkReport> {
-  const res = await fetch(`${API_BASE}/rework/report`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  return res.json();
-}
+export const getReworkReport = () => j<ReworkReport>("/rework/report");
+
+// ---------------------------------------------------------------- connections (OAuth)
+
+export type Connection = {
+  provider: string;   // google | slack | github | jira
+  label: string;
+  configured: boolean; // client id/secret present in the API's env
+  connected: boolean;  // a token is stored
+  account: string;
+  scope: string;
+};
+
+export const getConnections = () =>
+  j<{ connections: Connection[] }>("/auth/connections").then((r) => r.connections);
+
+export const disconnectProvider = (provider: string) =>
+  j<{ ok: boolean; provider: string }>(`/auth/${provider}/disconnect`, { method: "POST" });
+
+// Connect is a server-side redirect, so it must be a real navigation (an <a href>), not fetch.
+export const loginUrl = (provider: string) => `${API_BASE}/auth/${provider}/login`;

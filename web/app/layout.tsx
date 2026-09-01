@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Invisible Work Detector",
-  description: "Discover repetitive invisible work and automate it.",
+  description: "Find invisible work, automate it, and watch your automations run.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

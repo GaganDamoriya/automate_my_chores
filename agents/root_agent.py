@@ -1,11 +1,14 @@
-"""Root orchestration.
+"""Root orchestration for the automation platform.
 
-`discovery_pipeline` is the automation lane, run as a deterministic ADK
-SequentialAgent: Observer -> Pattern -> Analyst -> Automation -> Verification.
-State flows between stages via each agent's output_key (shared session state).
+Two ways the agents run:
+  • `discovery_pipeline` — the WATCHER chain (Observer -> Pattern -> Analyst -> Automation
+    -> Verification), a deterministic ADK SequentialAgent that observes workflows and
+    surfaces automation opportunities. State flows via each agent's output_key.
+  • `master_agent` — the chat orchestrator that routes a user message to build an
+    automation (via `builder_agent`), suggest opportunities, or answer a question.
 
-`rework_agent` is a separate lane (see rework.py) triggered on its own schedule.
-ADK entrypoint: `root_agent`.
+ADK looks for `root_agent` as the module entrypoint; we keep the watcher chain there so
+`python -m agents.run_local` still streams the full discovery reasoning.
 """
 from google.adk.agents import SequentialAgent
 from .observer import observer_agent
@@ -14,6 +17,8 @@ from .analyst import analyst_agent
 from .automation import automation_agent
 from .verification import verification_agent
 from .rework import rework_agent
+from .builder import builder_agent
+from .master import master_agent
 
 discovery_pipeline = SequentialAgent(
     name="invisible_work_detector",
@@ -27,5 +32,5 @@ discovery_pipeline = SequentialAgent(
     ],
 )
 
-# ADK looks for `root_agent` as the module entrypoint.
+# ADK entrypoint.
 root_agent = discovery_pipeline
